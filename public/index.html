@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Arduino IoT Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .card {
+      background: white;
+      max-width: 500px;
+      margin: auto;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .value {
+      font-size: 60px;
+      font-weight: bold;
+      color: #007bff;
+      margin: 20px 0;
+    }
+
+    table {
+      margin: 30px auto;
+      border-collapse: collapse;
+      width: 90%;
+      background: white;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+
+    th {
+      background: #007bff;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Arduino IoT Dashboard</h1>
+
+    <p>Live Sensor Value:</p>
+    <div class="value" id="sensorValue">---</div>
+
+    <p>Last Updated:</p>
+    <div id="time">Waiting...</div>
+
+    <div id="buttons">
+    <button onclick="controlLed('red_on')"> Turn RED LED ON</button>
+    <button onclick="controlLed('red_off')">Turn RED LED OFF</button>
+
+    <button onclick="controlLed('green_on')"> Turn GREEN LED ON</button>
+    <button onclick="controlLed('green_off')">Turn GREEN LED OFF</button>
+    </div>
+
+    <p id="rawData">No data yet</p>
+  </div>
+
+  <h2>Latest Database Readings</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Sensor</th>
+        <th>Value</th>
+        <th>Raw Data</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="readingsTable">
+      <tr>
+        <td colspan="5">No readings yet</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    socket.on("sensorData", (data) => {
+      document.getElementById("sensorValue").innerText = data.value;
+      document.getElementById("time").innerText = data.time;
+      document.getElementById("rawData").innerText = data.raw;
+
+      loadReadings();
+    });
+
+    async function loadReadings() {
+      const response = await fetch("/api/readings");
+      const readings = await response.json();
+
+      const table = document.getElementById("readingsTable");
+      table.innerHTML = "";
+
+      readings.forEach((reading) => {
+        const row = `
+          <tr>
+            <td>${reading.id}</td>
+            <td>${reading.sensor_name}</td>
+            <td>${reading.sensor_value}</td>
+            <td>${reading.raw_data}</td>
+            <td>${reading.created_at}</td>
+          </tr>
+        `;
+
+        table.innerHTML += row;
+      });
+    }
+
+    loadReadings();
+  </script>
+
+  <script>
+    async function controlLed(state) {
+        const response = await fetch("/api/led", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ state })
+        });
+
+        const result = await response.json();
+        alert(result.message || result.error);
+    }
+    </script>
+
+</body>
+</html>
