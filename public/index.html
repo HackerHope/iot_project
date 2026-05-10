@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Arduino IoT Dashboard</title>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -26,6 +27,75 @@
       margin: 20px 0;
     }
 
+    .status-box {
+      margin: 15px auto;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+
+    .waiting {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .waiting::after {
+      content: "";
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0% {
+        content: "";
+      }
+
+      33% {
+        content: ".";
+      }
+
+      66% {
+        content: "..";
+      }
+
+      100% {
+        content: "...";
+      }
+    }
+
+    .connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    button {
+      margin: 8px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .red-btn {
+      background: #dc3545;
+      color: white;
+    }
+
+    .green-btn {
+      background: #28a745;
+      color: white;
+    }
+
     table {
       margin: 30px auto;
       border-collapse: collapse;
@@ -44,10 +114,15 @@
     }
   </style>
 </head>
+
 <body>
 
   <div class="card">
     <h1>Arduino IoT Dashboard</h1>
+
+    <div id="arduinoStatus" class="status-box waiting">
+      Waiting for Arduino
+    </div>
 
     <p>Live Sensor Value:</p>
     <div class="value" id="sensorValue">---</div>
@@ -56,11 +131,21 @@
     <div id="time">Waiting...</div>
 
     <div id="buttons">
-    <button onclick="controlLed('red_on')"> Turn RED LED ON</button>
-    <button onclick="controlLed('red_off')">Turn RED LED OFF</button>
+      <button class="red-btn led-button" onclick="controlLed('red_on')" disabled>
+        Turn RED LED ON
+      </button>
 
-    <button onclick="controlLed('green_on')"> Turn GREEN LED ON</button>
-    <button onclick="controlLed('green_off')">Turn GREEN LED OFF</button>
+      <button class="red-btn led-button" onclick="controlLed('red_off')" disabled>
+        Turn RED LED OFF
+      </button>
+
+      <button class="green-btn led-button" onclick="controlLed('green_on')" disabled>
+        Turn GREEN LED ON
+      </button>
+
+      <button class="green-btn led-button" onclick="controlLed('green_off')" disabled>
+        Turn GREEN LED OFF
+      </button>
     </div>
 
     <p id="rawData">No data yet</p>
@@ -78,6 +163,7 @@
         <th>Time</th>
       </tr>
     </thead>
+
     <tbody id="readingsTable">
       <tr>
         <td colspan="5">No readings yet</td>
@@ -86,8 +172,32 @@
   </table>
 
   <script src="/socket.io/socket.io.js"></script>
+
   <script>
     const socket = io();
+
+    const statusBox = document.getElementById("arduinoStatus");
+    const ledButtons = document.querySelectorAll(".led-button");
+
+    function updateArduinoStatus(connected, message) {
+      statusBox.innerText = message;
+
+      if (connected) {
+        statusBox.className = "status-box connected";
+        ledButtons.forEach((button) => {
+          button.disabled = false;
+        });
+      } else {
+        statusBox.className = "status-box waiting";
+        ledButtons.forEach((button) => {
+          button.disabled = true;
+        });
+      }
+    }
+
+    socket.on("arduinoStatus", (status) => {
+      updateArduinoStatus(status.connected, status.message);
+    });
 
     socket.on("sensorData", (data) => {
       document.getElementById("sensorValue").innerText = data.value;
@@ -97,45 +207,81 @@
       loadReadings();
     });
 
-    async function loadReadings() {
-      const response = await fetch("/api/readings");
-      const readings = await response.json();
+    async function checkArduinoStatus() {
+      try {
+        const response = await fetch("/api/arduino/status");
+        const status = await response.json();
 
-      const table = document.getElementById("readingsTable");
-      table.innerHTML = "";
-
-      readings.forEach((reading) => {
-        const row = `
-          <tr>
-            <td>${reading.id}</td>
-            <td>${reading.sensor_name}</td>
-            <td>${reading.sensor_value}</td>
-            <td>${reading.raw_data}</td>
-            <td>${reading.created_at}</td>
-          </tr>
-        `;
-
-        table.innerHTML += row;
-      });
+        updateArduinoStatus(status.connected, status.message);
+      } catch (error) {
+        updateArduinoStatus(false, "Backend not connected");
+      }
     }
 
-    loadReadings();
-  </script>
+    async function loadReadings() {
+      try {
+        const response = await fetch("/api/readings");
+        const readings = await response.json();
 
-  <script>
+        const table = document.getElementById("readingsTable");
+        table.innerHTML = "";
+
+        if (readings.length === 0) {
+          table.innerHTML = `
+            <tr>
+              <td colspan="5">No readings yet</td>
+            </tr>
+          `;
+          return;
+        }
+
+        readings.forEach((reading) => {
+          const row = `
+            <tr>
+              <td>${reading.id}</td>
+              <td>${reading.sensor_name}</td>
+              <td>${reading.sensor_value}</td>
+              <td>${reading.raw_data}</td>
+              <td>${reading.created_at}</td>
+            </tr>
+          `;
+
+          table.innerHTML += row;
+        });
+      } catch (error) {
+        const table = document.getElementById("readingsTable");
+
+        table.innerHTML = `
+          <tr>
+            <td colspan="5">Could not load readings</td>
+          </tr>
+        `;
+      }
+    }
+
     async function controlLed(state) {
+      try {
         const response = await fetch("/api/led", {
-        method: "POST",
-        headers: {
+          method: "POST",
+          headers: {
             "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ state })
+          },
+          body: JSON.stringify({ state })
         });
 
         const result = await response.json();
+
         alert(result.message || result.error);
+      } catch (error) {
+        alert("Could not send command to backend");
+      }
     }
-    </script>
+
+    checkArduinoStatus();
+    loadReadings();
+
+    setInterval(checkArduinoStatus, 2000);
+  </script>
 
 </body>
 </html>
