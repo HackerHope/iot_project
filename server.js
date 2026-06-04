@@ -19,7 +19,7 @@ let port = null;
 let parser = null;
 let arduinoConnected = false;
 
-const ARDUINO_PORT = "COM18"; // change this if Arduino uses a different COM port
+const ARDUINO_PORT = "COM23"; // change this if Arduino uses a different COM port
 const BAUD_RATE = 9600;
 
 // MQTT connection
@@ -27,11 +27,31 @@ const mqttClient = mqtt.connect("mqtt://localhost:1883");
 
 mqttClient.on("connect", () => {
   console.log("Connected to MQTT broker");
-  mqttClient.subscribe("iot/led/control");
+  mqttClient.subscribe("iot/led/control", (err) => {
+    if (err) {
+      console.error("MQTT subscribe failed:", err.message || err);
+    }
+  });
+});
+
+mqttClient.on("reconnect", () => {
+  console.log("MQTT reconnecting...");
+});
+
+mqttClient.on("close", () => {
+  console.log("MQTT connection closed");
+});
+
+mqttClient.on("offline", () => {
+  console.log("MQTT offline");
 });
 
 mqttClient.on("error", (err) => {
-  console.log("MQTT error:", err.message);
+  if (err) {
+    console.log("MQTT error:", err.message || err.toString());
+  } else {
+    console.log("MQTT error: unknown error event");
+  }
 });
 
 mqttClient.on("message", (topic, message) => {
@@ -65,7 +85,7 @@ mqttClient.on("message", (topic, message) => {
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "", // put your MySQL password here
+  password: "kevin10King11", // put your MySQL password here
   database: "iot_test_db",
 });
 
@@ -78,11 +98,11 @@ db.connect((err) => {
   console.log("Connected to MySQL database");
 });
 
-// Arduino connection function
-function connectToArduino() {
+// ESP32 connection function
+function connectToESP32() {
   if (arduinoConnected) return;
 
-  console.log("Checking for Arduino...");
+  console.log("Checking for ESP32...");
 
   port = new SerialPort({
     path: ARDUINO_PORT,
@@ -97,7 +117,7 @@ function connectToArduino() {
 
       io.emit("arduinoStatus", {
         connected: false,
-        message: "Waiting for Arduino...",
+        message: "Waiting for ESP32...",
       });
 
       return;
@@ -108,7 +128,7 @@ function connectToArduino() {
 
     io.emit("arduinoStatus", {
       connected: true,
-      message: "Arduino connected",
+      message: "ESP32 connected",
     });
 
     parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
@@ -121,7 +141,7 @@ function connectToArduino() {
 
     io.emit("arduinoStatus", {
       connected: false,
-      message: "Arduino error",
+      message: "ESP32 error",
     });
   });
 
@@ -131,39 +151,45 @@ function connectToArduino() {
 
     io.emit("arduinoStatus", {
       connected: false,
-      message: "Arduino disconnected. Waiting...",
+      message: "ESP32 disconnected. Waiting...",
     });
   });
 }
 
 // Handle data from Arduino
 function handleArduinoData(data) {
-  console.log("Arduino:", data);
+  const raw = data.toString().trim();
+  console.log("ESP32 raw data:", raw);
 
-  const value = data.split("=")[1];
+  let sensorValue;
+  const parts = raw.split("=");
 
-  if (!value) {
-    console.log("Invalid data:", data);
+  if (parts.length === 2 && parts[1] !== "") {
+    sensorValue = parseFloat(parts[1]);
+  } else {
+    const numericMatch = raw.match(/-?\d+(?:\.\d+)?/);
+    sensorValue = numericMatch ? parseFloat(numericMatch[0]) : NaN;
+  }
+
+  if (Number.isNaN(sensorValue)) {
+    console.log("Invalid data:", raw);
     return;
   }
 
-  const sensorValue = parseFloat(value);
-
-  mqttClient.publish(
-    "iot/sensor/ir",
-    JSON.stringify({
-      sensor: "ir Sensor",
-      value: sensorValue,
-      raw: data,
-      time: new Date().toLocaleTimeString(),
-    })
-  );
-
-  io.emit("sensorData", {
-    raw: data,
+  const payload = {
+    sensor: "ir Sensor",
     value: sensorValue,
+    raw,
     time: new Date().toLocaleTimeString(),
+  };
+
+  mqttClient.publish("iot/sensor/ir", JSON.stringify(payload), (err) => {
+    if (err) {
+      console.error("Failed to publish MQTT sensor data:", err.message);
+    }
   });
+
+  io.emit("sensorData", payload);
 
   const sql = `
     INSERT INTO sensor_readings 
@@ -171,7 +197,7 @@ function handleArduinoData(data) {
     VALUES (?, ?, ?)
   `;
 
-  db.query(sql, ["ir Sensor", sensorValue, data], (err, result) => {
+  db.query(sql, ["ir Sensor", sensorValue, raw], (err, result) => {
     if (err) {
       console.error("Database insert failed:", err.message);
       return;
@@ -181,12 +207,12 @@ function handleArduinoData(data) {
   });
 }
 
-// Start trying to connect to Arduino
-connectToArduino();
+// Start trying to connect to ESP32
+connectToESP32();
 
 setInterval(() => {
   if (!arduinoConnected) {
-    connectToArduino();
+    connectToESP32();
   }
 }, 3000);
 
@@ -240,7 +266,7 @@ app.post("/api/led", (req, res) => {
 
   if (!arduinoConnected || !port) {
     return res.status(503).json({
-      error: "Arduino is not connected yet",
+      error: "ESP32 is not connected yet",
       command,
     });
   }

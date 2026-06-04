@@ -1,44 +1,66 @@
-const int redLed = 2;
-const int greenLed = 4;
-const int irPin = A1;
+//Import DHT library for sensor
+#include "DHT.h"
 
-void setup() {
+//Defining DHT variables
+#define DHTPIN 4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// Output devices definition
+int buzzer = 5;
+int led = 17;
+
+String command = "";
+
+
+void setup(){
   Serial.begin(9600);
-
-  pinMode(redLed, OUTPUT);
-  pinMode(greenLed, OUTPUT);
-
-  digitalWrite(redLed, LOW);
-  digitalWrite(greenLed, LOW);
+  Serial.println(F("SENSOR TEST"));
+  pinMode(buzzer, OUTPUT);
+  pinMode(led, OUTPUT);
+  
+  dht.begin();
+  
 }
 
-void loop() {
-  int sensorValue = analogRead(irPin);
+void loop(){
+  // Wait a few moments between measurements 
+  delay(2000);
 
-  Serial.print("sensor=");
-  Serial.println(sensorValue);
+  float t = dht.readTemperature();
 
-  if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
+  if (isnan(t)){
+    Serial.println(F("Failed to read from DHT sensor!"));
+    return;
+  }
+  
+  Serial.print(F("Temperature: "));
+  Serial.println(t);
+
+  // Receiving commands from Node js 
+  if(Serial.available()){
+    command = Serial.readStringUntil('\n');
     command.trim();
 
-    if (command == "RED_ON") {
-      digitalWrite(redLed, HIGH);
-      Serial.println("red=on");
-    } 
-    else if (command == "RED_OFF") {
-      digitalWrite(redLed, LOW);
-      Serial.println("red=off");
-    } 
-    else if (command == "GREEN_ON") {
-      digitalWrite(greenLed, HIGH);
-      Serial.println("green=on");
-    } 
-    else if (command == "GREEN_OFF") {
-      digitalWrite(greenLed, LOW);
-      Serial.println("green=off");
+    if(command == "Buzz"){
+      Serial.println(command);
+      digitalWrite(buzzer, HIGH);
+    }
+    else if(command == "Shhh"){
+      Serial.println(command);
+      digitalWrite(buzzer, LOW);
+    }
+    else {
+      Serial.println(command);
+      digitalWrite(buzzer, HIGH);
+      delay(500);
+      digitalWrite(buzzer, LOW);
+      delay(500);
+      digitalWrite(buzzer, HIGH);
+      delay(1000);
+      digitalWrite(buzzer, LOW);
     }
   }
-
-  delay(1000);
+  
+  
 }
