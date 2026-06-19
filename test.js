@@ -62,7 +62,7 @@ app.get("/api/arduino/status", (req, res) => {
   });
 });
 
-app.post("/api/commands", (req, res) => {
+app.post("/api/led", (req, res) => {
   const { state } = req.body;
 
   let command = "";
@@ -85,11 +85,11 @@ app.post("/api/commands", (req, res) => {
       break;
 
     case "buzzer_on":
-      command = "BUZZ";
+      command = "BUZZER_ON";
       break;
 
     case "buzzer_off":
-      command = "QUIET";
+      command = "BUZZER_OFF";
       break;
 
     default:

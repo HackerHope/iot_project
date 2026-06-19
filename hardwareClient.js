@@ -43,7 +43,7 @@ parser.on("data", (data) => {
   ) {
 
     socket.emit("sensorError", {
-      sensor: "ir Sensor",
+      sensor: "Temperature Sensor",
       error: raw,
       time: new Date().toLocaleTimeString()
     });
@@ -65,7 +65,7 @@ parser.on("data", (data) => {
   if (!Number.isNaN(sensorValue)) {
 
     socket.emit("sensorData", {
-      sensor: "ir Sensor",
+      sensor: "Temperature Sensor",
       value: sensorValue,
       raw,
       time: new Date().toLocaleTimeString()
