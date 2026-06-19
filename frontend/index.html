@@ -404,7 +404,7 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-  const socket = io("https://YOUR_RENDER_APP.onrender.com");
+  const socket = io("https://arduino-control-project.onrender.com");
 
   const connLed = document.getElementById('connLed');
   const connText = document.getElementById('connText');
@@ -502,7 +502,7 @@
     if(!arduinoConnected) return;
     btnEl.disabled = true;
     try{
-      const res = await fetch("https://arduino-control-project.onrender.com", {
+      const res = await fetch("https://arduino-control-project.onrender.com/api/led", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state })
