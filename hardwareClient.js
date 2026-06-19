@@ -37,13 +37,23 @@ parser.on("data", (data) => {
 
   console.log("Arduino:", raw);
 
+  const lower = raw.toLowerCase();
+
+  // Figure out which sensor this line actually came from
+  let sensorName = "Sensor";
+  if (lower.includes("humid")) {
+    sensorName = "Humidity Sensor";
+  } else if (lower.includes("temp")) {
+    sensorName = "Temperature Sensor";
+  }
+
   if (
-    raw.toLowerCase().includes("error") ||
-    raw.toLowerCase().includes("failed")
+    lower.includes("error") ||
+    lower.includes("failed")
   ) {
 
     socket.emit("sensorError", {
-      sensor: "Temperature Sensor",
+      sensor: sensorName,
       error: raw,
       time: new Date().toLocaleTimeString()
     });
@@ -65,7 +75,7 @@ parser.on("data", (data) => {
   if (!Number.isNaN(sensorValue)) {
 
     socket.emit("sensorData", {
-      sensor: "Temperature Sensor",
+      sensor: sensorName,
       value: sensorValue,
       raw,
       time: new Date().toLocaleTimeString()
