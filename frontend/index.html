@@ -502,7 +502,7 @@
     if(!arduinoConnected) return;
     btnEl.disabled = true;
     try{
-      const res = await fetch("https://YOUR_RENDER_APP.onrender.com/api/led", {
+      const res = await fetch("https://arduino-control-project.onrender.com", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state })

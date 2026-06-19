@@ -2,8 +2,7 @@ const io = require("socket.io-client");
 const { SerialPort } = require("serialport");
 const { ReadlineParser } = require("@serialport/parser-readline");
 
-const SERVER_URL =
-  "https://YOUR_RENDER_APP.onrender.com";
+const SERVER_URL = "https://arduino-control-project.onrender.com";
 
 const port = new SerialPort({
   path: "COM18",
